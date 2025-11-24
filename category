@@ -1,0 +1,23 @@
+
+  GET|HEAD        / ................................................................................................ 
+  POST            _boost/browser-logs ........................................................... boost.browser-logs
+  GET|HEAD        api/addresses .......................................... addresses.index › AddressController@index
+  POST            api/addresses .......................................... addresses.store › AddressController@store
+  GET|HEAD        api/addresses/{address} .................................. addresses.show › AddressController@show
+  PUT|PATCH       api/addresses/{address} .............................. addresses.update › AddressController@update
+  DELETE          api/addresses/{address} ............................ addresses.destroy › AddressController@destroy
+  GET|HEAD        api/categories ....................................... categories.index › CategoryController@index
+  POST            api/categories ....................................... categories.store › CategoryController@store
+  GET|HEAD        api/categories/{category} .............................. categories.show › CategoryController@show
+  PUT|PATCH       api/categories/{category} .......................... categories.update › CategoryController@update
+  DELETE          api/categories/{category} ........................ categories.destroy › CategoryController@destroy
+  POST            api/login ............................................................... Api\AuthController@login
+  POST            api/logout ............................................................. Api\AuthController@logout
+  POST            api/register ......................................................... Api\AuthController@register
+  DELETE          api/user/deactivate ......................................... Api\AuthController@deactivateAccount
+  GET|HEAD        sanctum/csrf-cookie ............ sanctum.csrf-cookie › Laravel\Sanctum › CsrfCookieController@show
+  GET|HEAD        storage/{path} ..................................................................... storage.local
+  GET|HEAD        up ............................................................................................... 
+
+                                                                                                 Showing [19] routes
+
