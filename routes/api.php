@@ -27,7 +27,8 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::apiResource('categories', CategoryController::class);
     Route::apiResource('payment-methods', PaymentMethodController::class);
     //transaction controller 
-    Route::post('/transactions/sync', [TransactionController::class, 'sync']);
     Route::get('/transactions', [TransactionController::class, 'index']);
-    Route::get('/transactions/{id}', [TransactionController::class, 'show']);
+
+    Route::post('/transactions/sync', [TransactionController::class, 'sync']);
+    Route::get('/transactions/{uuid}', [TransactionController::class, 'show']);
 });

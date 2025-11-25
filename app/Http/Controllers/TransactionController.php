@@ -9,7 +9,6 @@ use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 
-use function Symfony\Component\Clock\now;
 
 class TransactionController extends Controller
 {
@@ -20,12 +19,53 @@ class TransactionController extends Controller
     {
 
         $transactions = Transaction::where('user_id', Auth::id())
+            ->with(['category', 'paymentMethod']) /// this solves N+1 problem ---> eager loading
             ->get();
 
         return response()->json([
             'response' => '200',
             'message' => 'Transaction data fetched successfully.',
             'data' => TransactionResource::collection($transactions),
+        ], 200);
+    }
+
+    /**
+     * Store a newly created resource in storage.
+     */
+    public function store(Request $request)
+    {
+        $userId = Auth::id();
+        $validated = $request->validate([
+            'uuid' => 'required|uuid',
+            'category_id' => 'required|exists:categories,id',
+            'payment_method_id' => 'required|exists:payment_methods,id',
+            'transaction_amount' => 'required|numeric|min:0',
+            'transaction_date' => 'required|date',
+            'client_updated_at' => 'required|date'
+        ]);
+        $category = Category::with(['user'])->findOrFail($validated['category_id']);
+
+        //  category is NOT global AND does NOT belong to the current user
+        if (!$category->is_global && $category->user_id !== $userId) {
+            return response()->json([
+                'response' => '401',
+                'message' => 'Invalid category (no access)',
+            ], 401);
+        }
+        $transaction = Transaction::create([
+            'uuid' => $validated['uuid'],
+            'user_id' => $userId,
+            'category_id' => $validated['category_id'],
+            'payment_method_id' => $validated['payment_method_id'],
+            'transaction_amount' => $validated['transaction_amount'],
+            'transaction_date' => $validated['transaction_date'],
+            'client_updated_at' => $validated['client_updated_at'],
+        ]);
+
+        return response()->json([
+            'response' => '200',
+            'message' => 'Transaction created successfully.',
+            'data' => new TransactionResource($transaction),
         ]);
     }
 
@@ -33,10 +73,12 @@ class TransactionController extends Controller
     /**
      * Display the specified resource.
      */
-    public function show(string $id)
+    public function show(string $uuid)
     {
-        $transaction = Transaction::where('id', $id)
-            ->where('user_id', Auth::id())->first();
+        $transaction = Transaction::where('uuid', $uuid)
+            ->where('user_id', Auth::id())
+            ->with(['category', 'paymentMethod'])
+            ->first();
 
         if (!$transaction) {
             return response()->json([
@@ -52,7 +94,45 @@ class TransactionController extends Controller
             'data' => new TransactionResource($transaction),
         ], 200);
     }
+    /**
+     * Update a newly created resource in storage.
+     */
+    public function update(Request $request, $uuid)
+    {
+        $userId = Auth::id();
 
+        $transaction = Transaction::where('uuid', $uuid)
+            ->where('user_id', $userId)
+            ->with(['category', 'paymentMethod'])
+            ->firstOrFail();
+
+
+        $validated = $request->validate([
+            'uuid' => 'required|uuid',
+            'category_id' => 'required|exists:categories,id',
+            'payment_method_id' => 'required|exists:payment_methods,id',
+            'transaction_amount' => 'required|numeric|min:0',
+            'transaction_date' => 'required|date',
+            'client_updated_at' => 'required|date'
+        ]);
+        $category = Category::with(['user'])->findOrFail($validated['category_id']);
+
+        //  category is NOT global AND does NOT belong to the current user
+        if (!$category->is_global && $category->user_id !== $userId) {
+            return response()->json([
+                'response' => '401',
+                'message' => 'Invalid category (no access)',
+            ], 401);
+        }
+
+        $transaction->update($validated);
+
+        return response()->json([
+            'response' => '200',
+            'message' => 'Transaction Updated successfully.',
+            'data' => new TransactionResource($transaction),
+        ]);
+    }
     /**
      * Offline-first sync endpoint
      */
