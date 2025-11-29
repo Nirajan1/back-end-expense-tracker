@@ -27,7 +27,7 @@ class PurgeSoftDeletedUser extends Command
      */
     public function handle()
     {
-        $threshold = Carbon::now()->subDay(30);
+        $threshold = Carbon::now()->subDays(30);
 
         $usersToDelete = User::onlyTrashed()
             ->where('deleted_at', '<', $threshold)
