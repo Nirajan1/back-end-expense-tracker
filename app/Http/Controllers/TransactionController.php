@@ -79,10 +79,13 @@ class TransactionController extends Controller
                 continue;
             }
 
-            $paymentMethod = PaymentMethod::find($item['payment_method_id']);
-            if (!$paymentMethod || $paymentMethod->user_id !== $userId) {
-                continue;
-            }
+            // $paymentMethod = PaymentMethod::find($item['payment_method_id']);
+            // if (!$paymentMethod || $paymentMethod->user_id !== $userId) {
+            //     return response()->json([
+            //         'message' => 'payment id data exists'
+            //     ]);
+            //     // continue;
+            // }
 
 
             $transaction = Transaction::create([
@@ -115,10 +118,10 @@ class TransactionController extends Controller
                 continue;
             }
 
-            $paymentMethod = PaymentMethod::find($item['payment_method_id']);
-            if (!$paymentMethod || $paymentMethod->user_id !== $userId) {
-                continue;
-            }
+            // $paymentMethod = PaymentMethod::find($item['payment_method_id']);
+            // if (!$paymentMethod || $paymentMethod->user_id !== $userId) {
+            //     continue;
+            // }
             $clientTime = strtotime($item['client_updated_at']);
             $serverTime = strtotime($transaction->client_updated_at);
 
