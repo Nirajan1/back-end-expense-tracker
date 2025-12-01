@@ -19,7 +19,6 @@ class CategoryFactory extends Factory
         return [
             'user_id' => null,
             'name' => $this->faker->word(),
-            'type' => $this->faker->randomElement(['INCOME', 'EXPENSE']),
 
         ];
     }

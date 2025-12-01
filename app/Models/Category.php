@@ -13,7 +13,6 @@ class Category extends Model
 
     protected $fillable = [
         'name',
-        'type',     // 'INCOME' or 'EXPENSE'
         'user_id',
         'is_global',
     ];
