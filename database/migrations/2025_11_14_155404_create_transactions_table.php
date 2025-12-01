@@ -23,6 +23,7 @@ return new class extends Migration
 
             //? core fields
             $table->decimal('transaction_amount', 10, 2);
+            $table->enum('transaction_type', ['income', 'expense', 'transfer'])->default('expense');
             $table->date('transaction_date');
 
             //? conflict resolution client side timestamps

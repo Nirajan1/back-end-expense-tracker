@@ -15,9 +15,19 @@ class CategoryResource extends JsonResource
     public function toArray(Request $request): array
     {
         return [
-            'id' => $this->id,
+            'uuid' => $this->uuid,
             'name' => $this->name,
             'is_global' => $this->is_global,
+
+            'client_updated_at'  => $this->client_updated_at?->toDateTimeString(),
+
+            // Server timestamps (important for sync)
+            'created_at' => $this->created_at?->toDateTimeString(),
+            'updated_at' => $this->updated_at?->toDateTimeString(),
+
+            // Soft-delete timestamp
+            'deleted_at' => $this->deleted_at?->toDateTimeString(),
+
         ];
     }
 }

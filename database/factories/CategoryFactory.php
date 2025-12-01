@@ -22,10 +22,4 @@ class CategoryFactory extends Factory
 
         ];
     }
-    public function forUser($userId = 3): self
-    {
-        return $this->state(fn() => [
-            'user_id' => $userId,
-        ]);
-    }
 }
