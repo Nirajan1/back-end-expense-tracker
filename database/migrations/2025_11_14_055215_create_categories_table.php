@@ -13,10 +13,19 @@ return new class extends Migration
     {
         Schema::create('categories', function (Blueprint $table) {
             $table->id();
+            //?uuid for offline
+            $table->string('uuid')->unique();
+
+            //?foreign keys
             $table->foreignId('user_id')->nullable()->constrained()->cascadeOnDelete();
+
+            //? core fields
             $table->string('name')->unique();
             $table->boolean('is_global')->default(false);
+
             $table->timestamps();
+            //?for sof deletes
+            $table->softDeletes();
         });
     }
 

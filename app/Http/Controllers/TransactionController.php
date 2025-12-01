@@ -47,6 +47,7 @@ class TransactionController extends Controller
             'created.*.payment_method_id' => 'required|exists:payment_methods,id',
             'created.*.transaction_amount' => 'required|numeric|min:0',
             'created.*.transaction_date' => 'required|date',
+            'created.*.transaction_type' => 'required',
             'created.*.client_updated_at' => 'required|date',
 
 
@@ -56,6 +57,7 @@ class TransactionController extends Controller
             'updated.*.payment_method_id' => 'required|exists:payment_methods,id',
             'updated.*.transaction_amount' => 'required|numeric|min:0',
             'updated.*.transaction_date' => 'required|date',
+            'updated.*.transaction_type' => 'required',
             'updated.*.client_updated_at' => 'required|date',
 
             'deleted' => 'array',
@@ -94,6 +96,7 @@ class TransactionController extends Controller
                 'category_id' => $item['category_id'],
                 'payment_method_id' => $item['payment_method_id'],
                 'transaction_amount' => $item['transaction_amount'],
+                'transaction_type' => $item['transaction_type'],
                 'transaction_date' => $item['transaction_date'],
                 'client_updated_at' => $item['client_updated_at'],
             ]);
@@ -131,6 +134,7 @@ class TransactionController extends Controller
                     'category_id' => $item['category_id'],
                     'payment_method_id' => $item['payment_method_id'],
                     'transaction_amount' => $item['transaction_amount'],
+                    'transaction_type' => $item['transaction_type'],
                     'transaction_date' => $item['transaction_date'],
                     'client_updated_at' => $item['client_updated_at'],
                 ]);

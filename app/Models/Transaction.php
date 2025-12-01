@@ -18,6 +18,7 @@ class Transaction extends Model
         'category_id',
         'payment_method_id',
         'transaction_amount',
+        'transaction_type',
         'transaction_date',
         'client_updated_at',
     ];
