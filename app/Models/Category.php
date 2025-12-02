@@ -28,6 +28,7 @@ class Category extends Model
         'uuid' => 'string',
         'is_global' => 'boolean',
         'client_updated_at' => 'datetime',
+        'deleted_at' => 'datetime',
     ];
     // A category can have many transactions.
     public function transactions()
