@@ -13,9 +13,14 @@ return new class extends Migration
     {
         Schema::create('payment_methods', function (Blueprint $table) {
             $table->id();
+            //uuid
+            $table->string('uuid')->unique();
             $table->string('name')->unique();
-            $table->boolean('is_global')->default(true);
+            $table->string('type');
+            $table->foreignId('user_id')->constrained()->cascadeOnDelete();
+            $table->timestamp('client_updated_at')->nullable();
             $table->timestamps();
+            $table->softDeletes();
         });
     }
 
