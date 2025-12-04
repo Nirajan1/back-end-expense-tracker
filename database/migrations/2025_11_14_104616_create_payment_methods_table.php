@@ -14,7 +14,7 @@ return new class extends Migration
         Schema::create('payment_methods', function (Blueprint $table) {
             $table->id();
             //uuid
-            $table->string('uuid')->unique();
+            $table->uuid('uuid')->unique();
             $table->string('name')->unique();
             $table->string('type');
             $table->foreignId('user_id')->constrained()->cascadeOnDelete();

@@ -24,8 +24,9 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/logout', [AuthController::class, 'logout']);
     Route::delete('/user/deactivate', [AuthController::class, 'deactivateAccount']);
     Route::apiResource('addresses', AddressController::class);
-    Route::apiResource('categories', CategoryController::class);
-    Route::apiResource('payment-methods', PaymentMethodController::class);
+    // category controller
+    Route::post('/categories/sync',[CategoryController::class, 'categorySync']);
+    Route::post('/payment-methods/sync', [PaymentMethodController::class, 'paymentMethodSync']);
     //transaction controller 
     Route::get('/transactions', [TransactionController::class, 'index']);
     Route::post('/transactions/sync', [TransactionController::class, 'sync']);
