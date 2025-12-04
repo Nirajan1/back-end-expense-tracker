@@ -14,7 +14,7 @@ return new class extends Migration
         Schema::create('categories', function (Blueprint $table) {
             $table->id();
             //?uuid for offline
-            $table->string('uuid')->unique();
+            $table->uuid('uuid')->unique();
 
             //?foreign keys
             $table->foreignId('user_id')->nullable()->constrained()->cascadeOnDelete();
@@ -22,7 +22,7 @@ return new class extends Migration
             //? core fields
             $table->string('name')->unique();
             $table->boolean('is_global')->default(false);
-            $table->timestamp('client_update_at')->nullable();
+            $table->timestamp('client_updated_at')->nullable();
 
             $table->timestamps();
             //?for sof deletes

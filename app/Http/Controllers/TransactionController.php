@@ -4,7 +4,6 @@ namespace App\Http\Controllers;
 
 use App\Http\Resources\TransactionResource;
 use App\Models\Category;
-use App\Models\PaymentMethod;
 use App\Models\Transaction;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
