@@ -14,13 +14,13 @@ return new class extends Migration
         Schema::create('categories', function (Blueprint $table) {
             $table->id();
             //?uuid for offline
-            $table->uuid('uuid')->unique();
+            $table->uuid('uuid')->unique()->index();
 
             //?foreign keys
             $table->foreignId('user_id')->nullable()->constrained()->cascadeOnDelete();
 
             //? core fields
-            $table->string('name')->unique();
+            $table->string('name');
             $table->boolean('is_global')->default(false);
             $table->timestamp('client_updated_at')->nullable();
 

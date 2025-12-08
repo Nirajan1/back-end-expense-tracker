@@ -24,10 +24,14 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/logout', [AuthController::class, 'logout']);
     Route::delete('/user/deactivate', [AuthController::class, 'deactivateAccount']);
     Route::apiResource('addresses', AddressController::class);
+
     // category controller
     Route::post('/categories/sync',[CategoryController::class, 'categorySync']);
+    
+    //? payment methods 
     Route::post('/payment-methods/sync', [PaymentMethodController::class, 'paymentMethodSync']);
-    //transaction controller 
+   
+    //? transaction controller 
     Route::get('/transactions', [TransactionController::class, 'index']);
     Route::post('/transactions/sync', [TransactionController::class, 'sync']);
     Route::get('/transactions/trashed', [TransactionController::class, 'trashed']);

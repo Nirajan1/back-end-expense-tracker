@@ -21,19 +21,19 @@ class PaymentMethodController extends Controller
             'last_sync_at' => 'required|date',
 
             'created' => 'array',
-            'created.*.uuid' => 'required||uuid',
+            'created.*.uuid' => 'required|uuid',
             'created.*.name' => 'required|string',
-            'created.*.type'    => 'required|in:CASH,BANK,CARD,WALLET,UPI',
+            'created.*.type'    => 'required|in:CASH,BANK,CARD,WALLET,ONLINE',
             'created.*.client_updated_at' => 'required|date',
 
             'updated' => 'array',
             'updated.*.uuid' => 'required|uuid|exists:paymentMethods,uuid',
             'updated.*.name' => 'required|string',
-            'updated.*type' => 'required|in:CASH,BANK,CARD,WALLET,UPI',
+            'updated.*.type' => 'required|in:CASH,BANK,CARD,WALLET,ONLINE',
             'updated.*.client_updated_at' => 'required|date',
 
             'deleted' => 'array',
-            'deleted.*.uuid' => 'required|uuid|exists:paymentMethods,uuid'
+            'deleted.*.uuid' => 'required|uuid|exists:payment_methods,uuid'
 
         ]);
 
@@ -46,6 +46,25 @@ class PaymentMethodController extends Controller
         // --------------
 
         foreach ($validated['created'] ?? [] as $paymentMethodData) {
+            // check of existing uuid and skip
+            $existing = PaymentMethod::withTrashed()
+                ->where('uuid', $paymentMethodData['uuid'])
+                ->where('user_id', $userId)
+                ->first();
+
+            if ($existing) continue;
+
+            //if also same name skip
+
+            if (
+                PaymentMethod::whereRaw('LOWER (name) = ?', [strtolower($paymentMethodData['name'])])
+                ->where('user_id', $userId)
+                ->exists()
+            ) {
+                continue;
+            }
+
+
             $paymentMethod = PaymentMethod::create([
                 'uuid' => $paymentMethodData['uuid'],
                 'name' => $paymentMethodData['name'],
@@ -53,6 +72,7 @@ class PaymentMethodController extends Controller
                 'user_id' => $userId,
                 'client_updated_at' => $paymentMethodData['client_updated_at'],
             ]);
+
             $createdResponse[] = $paymentMethod;
         }
 
@@ -88,10 +108,12 @@ class PaymentMethodController extends Controller
         // --------------
 
         if (!empty($validated['deleted'])) {
-            $toDelete = PaymentMethod::whereIn('uuid', $validated['deleted'])->where('user_id', $userId)->get();
+            $toDelete = PaymentMethod::whereIn('uuid', $validated['deleted'])
+                ->where('user_id', $userId)
+                ->get();
             foreach ($toDelete as $deleteItem) {
                 if (!$deleteItem->deleted_at) {
-                    $deleteItem->delte();
+                    $deleteItem->delete();
                 }
             }
             $deletedResponse[] = $validated['deleted'];
@@ -116,7 +138,7 @@ class PaymentMethodController extends Controller
             'data' => [
                 'created' => PaymentMethodResource::collection($createdResponse),
                 'updated' => PaymentMethodResource::collection($updatedResponse),
-                'chagned' => PaymentMethodResource::collection($changedPaymentMethodsData),
+                'changed' => PaymentMethodResource::collection($changedPaymentMethodsData),
                 'deleted' => $deletedResponse,
                 'server_time' => Carbon::now()->toIso8601String(),
             ],

@@ -43,11 +43,55 @@ class CategoryController extends Controller
         foreach ($validated['created'] ?? [] as $categoryItem) {
 
             //? if we created existing category with same uuid
-            if ($existingCategory = Category::where('uuid', $categoryItem['uuid'])->first()) {
-                $createdCategoryResp[] = $existingCategory;
+
+            $existing = Category::withTrashed()
+                ->where('uuid', $categoryItem['uuid'])
+                ->where('user_id', $userId)
+                ->first();
+
+
+            if ($existing) {
+                // Restore soft-deleted category
+                if ($existing->trashed()) {
+                    $existing->restore();
+                }
+
+                // Update timestamp if needed
+                $client = strtotime($categoryItem['client_updated_at']);
+                $server = strtotime($existing->client_updated_at ?? '1970-01-01');
+
+                if ($client > $server) {
+                    $existing->update([
+                        'name' => trim($categoryItem['name']),
+                        'client_updated_at' => $categoryItem['client_updated_at'],
+                    ]);
+                }
+
+                $createdCategoryResp[] = $existing;
                 continue;
             }
 
+            // ? case 2 
+
+            $restored = Category::onlyTrashed()
+                ->where('user_id', $userId)
+                ->whereRaw('LOWER (name) = ? ', [strtolower($categoryItem['name'])])
+                ->first();
+            if ($restored) {
+                $restored->restore();
+
+                $restored->update([
+                    'uuid' => $categoryItem['uuid'],
+                    'name'  => $categoryItem['name'],
+                    'client_updated_at' => $categoryItem['client_updated_at'],
+                ]);
+
+                $createdCategoryResp[] = $restored;
+                continue;
+            }
+
+
+            //case 3 if genuinely new create new one immdeiatly
             $newCategory = Category::create([
                 'uuid' => $categoryItem['uuid'],
                 'user_id' => $userId,
@@ -75,6 +119,7 @@ class CategoryController extends Controller
             // if client_update_at is new date compared to server time than update it
             $clientTime = strtotime($item['client_updated_at']);
             $serverTime = strtotime($category->client_updated_at);
+
             if (! $serverTime || $clientTime > $serverTime) {
                 $category->update([
                     'name' => $item['name'],
@@ -88,12 +133,16 @@ class CategoryController extends Controller
         // Handle Deleted
         // ----------------
         if (!empty($validated['deleted'])) {
-            $toDelete = Category::whereIn('uuid', $validated['uuid'])
+            $toDelete = Category::whereIn('uuid', $validated['deleted'])
                 ->where('user_id', $userId)
                 ->get();
 
             foreach ($toDelete as $item) {
-                if (!$item->deleted_at || !$item->is_global) {
+                // skip if time is global
+                if ($item->is_global) continue;
+
+                // soft delete
+                if (!$item->deleted_at) {
                     $item->delete();
                 }
             }
