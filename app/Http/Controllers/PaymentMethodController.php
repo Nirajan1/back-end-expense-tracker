@@ -33,7 +33,7 @@ class PaymentMethodController extends Controller
             'updated.*.client_updated_at' => 'required|date',
 
             'deleted' => 'array',
-            'deleted.*.uuid' => 'required|uuid|exists:payment_methods,uuid'
+            'deleted.*.uuid' => 'required|uuid'
 
         ]);
 
@@ -47,23 +47,50 @@ class PaymentMethodController extends Controller
 
         foreach ($validated['created'] ?? [] as $paymentMethodData) {
             // check of existing uuid and skip
-            $existing = PaymentMethod::withTrashed()
+            $existingByUuid = PaymentMethod::withTrashed()
                 ->where('uuid', $paymentMethodData['uuid'])
                 ->where('user_id', $userId)
                 ->first();
 
-            if ($existing) continue;
+            if ($existingByUuid) {
+                if ($existingByUuid->trashed()) {
+                    $existingByUuid->restore();
+                }
+                //update if client has new version
+                $clientTime = strtotime($paymentMethodData['client_updated_at']);
+                $serverTime = strtotime($existingByUuid->client_updated_at ?? '1970-01-01');
 
-            //if also same name skip
-
-            if (
-                PaymentMethod::whereRaw('LOWER (name) = ?', [strtolower($paymentMethodData['name'])])
-                ->where('user_id', $userId)
-                ->exists()
-            ) {
+                if ($clientTime > $serverTime) {
+                    $existingByUuid->update([
+                        'name' => trim($paymentMethodData['name']),
+                        'type' => $paymentMethodData['type'],
+                        'client_updated_at' => $paymentMethodData['client_updated_at'],
+                    ]);
+                }
+                $createdResponse[] = $existingByUuid;
                 continue;
             }
 
+            // Case 2 : Check for soft deleted and restore
+            $softDeletedSameName = PaymentMethod::onlyTrashed()
+                ->where('user_id', $userId)
+                ->whereRaw('LOWER (name) = ? ', [strtolower($paymentMethodData['name'])])
+                ->first();
+
+            if ($softDeletedSameName) {
+
+                $softDeletedSameName->restore();
+
+                $softDeletedSameName->update([
+                    'uuid' => $paymentMethodData['uuid'],
+                    'name' => trim($paymentMethodData['name']),
+                    'type' => $paymentMethodData['type'],
+                    'client_updated_at' => $paymentMethodData['client_updated_at']
+                ]);
+
+                $createdResponse[] = $softDeletedSameName;
+                continue;
+            }
 
             $paymentMethod = PaymentMethod::create([
                 'uuid' => $paymentMethodData['uuid'],
@@ -134,13 +161,14 @@ class PaymentMethodController extends Controller
 
         return response()->json([
             'response' => '200',
-            'message' => 'Payment Methods synchronized successfull',
+            'message' => 'Payment Methods synchronized successfully',
             'data' => [
                 'created' => PaymentMethodResource::collection($createdResponse),
                 'updated' => PaymentMethodResource::collection($updatedResponse),
                 'changed' => PaymentMethodResource::collection($changedPaymentMethodsData),
                 'deleted' => $deletedResponse,
                 'server_time' => Carbon::now()->toIso8601String(),
+                'not' => 'Duplicate payment method is allowed. Client should handle merging if needed.'
             ],
         ]);
     }

@@ -29,7 +29,7 @@ class CategoryController extends Controller
             'updated.*.client_updated_at' => 'required|date',
 
             'deleted' => 'array',
-            'deleted.*' => 'required|uuid|exists:categories,uuid'
+            'deleted.*' => 'required|uuid'
         ]);
 
         $createdCategoryResp = [];
@@ -42,7 +42,7 @@ class CategoryController extends Controller
 
         foreach ($validated['created'] ?? [] as $categoryItem) {
 
-            //? if we created existing category with same uuid
+            //? Case 1: Check for same uuid, including soft deletes
 
             $existing = Category::withTrashed()
                 ->where('uuid', $categoryItem['uuid'])
@@ -73,25 +73,25 @@ class CategoryController extends Controller
 
             // ? case 2 
 
-            $restored = Category::onlyTrashed()
+            $softDeletedSameName = Category::onlyTrashed()
                 ->where('user_id', $userId)
                 ->whereRaw('LOWER (name) = ? ', [strtolower($categoryItem['name'])])
                 ->first();
-            if ($restored) {
-                $restored->restore();
+            if ($softDeletedSameName) {
+                $softDeletedSameName->restore();
 
-                $restored->update([
+                $softDeletedSameName->update([
                     'uuid' => $categoryItem['uuid'],
                     'name'  => $categoryItem['name'],
                     'client_updated_at' => $categoryItem['client_updated_at'],
                 ]);
 
-                $createdCategoryResp[] = $restored;
+                $createdCategoryResp[] = $softDeletedSameName;
                 continue;
             }
 
 
-            //case 3 if genuinely new create new one immdeiatly
+            //case 3 if genuinely new create new one immediately
             $newCategory = Category::create([
                 'uuid' => $categoryItem['uuid'],
                 'user_id' => $userId,
@@ -146,20 +146,22 @@ class CategoryController extends Controller
                     $item->delete();
                 }
             }
-            $deletedCategoryResp[] = $validated['deleted'];
+            $deletedCategoryResp = $validated['deleted'];
         }
 
         // full response 
+        $lastSyncTime = Carbon::parse($validated['last_sync_at']);
+
 
         $changedCategoryData = Category::withTrashed()
             ->where(function ($data) use ($userId) {
                 $data->where('user_id', $userId)
-                    ->orWhereNull('user_id');
+                    ->orWhereNull('user_id'); // -------->this will also include global category
             })
-            ->where(function ($q) use ($validated) {
-                $q->where('created_at', '>=', $validated['last_sync_at'])
-                    ->orWhere('updated_at', '>=', $validated['last_sync_at'])
-                    ->orWhere('deleted_at', '>=', $validated['last_sync_at']);
+            ->where(function ($q) use ($lastSyncTime) {
+                $q->where('created_at', '>=', $lastSyncTime)
+                    ->orWhere('updated_at', '>=', $lastSyncTime)
+                    ->orWhere('deleted_at', '>=', $lastSyncTime);
             })->get();
 
         return response()->json([
@@ -171,6 +173,7 @@ class CategoryController extends Controller
                 'changes' => CategoryResource::collection($changedCategoryData),
                 'deleted' => $deletedCategoryResp,
                 'server_time' => Carbon::now()->toIso8601String(),
+                'note' => 'Duplicate categories are allowed. Client should handel merging if needed.'
             ],
         ]);
     }

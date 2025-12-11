@@ -4,10 +4,12 @@ namespace App\Http\Controllers;
 
 use App\Http\Resources\TransactionResource;
 use App\Models\Category;
+use App\Models\PaymentMethod;
 use App\Models\Transaction;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 
 use function Symfony\Component\Clock\now;
 
@@ -42,131 +44,189 @@ class TransactionController extends Controller
 
             'created' => 'array',
             'created.*.uuid' => 'required|uuid',
-            'created.*.category_id' => 'required|exists:categories,id',
-            'created.*.payment_method_id' => 'required|exists:payment_methods,id',
+            'created.*.category_id' => 'required|integer',
+            'created.*.payment_method_id' => 'required|integer',
             'created.*.transaction_amount' => 'required|numeric|min:0',
             'created.*.transaction_date' => 'required|date',
-            'created.*.transaction_type' => 'required',
+            'created.*.transaction_type' => 'required|in:income,expense',
             'created.*.client_updated_at' => 'required|date',
 
 
             'updated' => 'array',
-            'updated.*.uuid' => 'required|uuid|exists:transactions,uuid',
-            'updated.*.category_id' => 'required|exists:categories,id',
-            'updated.*.payment_method_id' => 'required|exists:payment_methods,id',
+            'updated.*.uuid' => 'required|uuid',
+            'updated.*.category_id' => 'required|integer',
+            'updated.*.payment_method_id' => 'required|integer',
             'updated.*.transaction_amount' => 'required|numeric|min:0',
             'updated.*.transaction_date' => 'required|date',
-            'updated.*.transaction_type' => 'required',
+            'updated.*.transaction_type' => 'required|in:income,expense',
             'updated.*.client_updated_at' => 'required|date',
 
             'deleted' => 'array',
-            'deleted.*' => 'required|uuid|exists:transactions,uuid',
+            'deleted.*' => 'required|uuid',
         ]);
 
         $createdResp  = [];
         $updatedResp = [];
         $deletedResp  = [];
+        $invalidReference = [];
 
-        // -------------------
-        // Handle Created
-        // -------------------
-        foreach ($validated['created'] ?? [] as $item) {
-            //skip if already synced earlier
-            if (Transaction::where('uuid', $item['uuid'])->exists()) continue;
+        DB::beginTransaction();
+        try {
+            // -------------------
+            // Handle Created
+            // -------------------
 
-            // check category
-            $category = Category::find($item['category_id']);
-            if (!$category || (!$category->is_global && $category->user_id !== $userId)) {
-                continue;
-            }
-
-            // $paymentMethod = PaymentMethod::find($item['payment_method_id']);
-            // if (!$paymentMethod || $paymentMethod->user_id !== $userId) {
-            //     return response()->json([
-            //         'message' => 'payment id data exists'
-            //     ]);
-            //     // continue;
-            // }
+            foreach ($validated['created'] ?? [] as $item) {
+                //? Case 1. Check by uuid
+                $existingByUuid = Transaction::withTrashed()
+                    ->where('uuid', $item['uuid'])
+                    ->where('user_id', $userId)
+                    ->first();
 
 
-            $transaction = Transaction::create([
-                'uuid' => $item['uuid'],
-                'user_id' => $userId,
-                'category_id' => $item['category_id'],
-                'payment_method_id' => $item['payment_method_id'],
-                'transaction_amount' => $item['transaction_amount'],
-                'transaction_type' => $item['transaction_type'],
-                'transaction_date' => $item['transaction_date'],
-                'client_updated_at' => $item['client_updated_at'],
-            ]);
+                $categoryValidation = $this->validateCategory($item['category_id'], $userId);
+                $paymentValidation = $this->validatePaymentMethod($item['payment_method_id'], $userId);
 
-            $createdResp[] = $transaction;
-        }
+                if (!$categoryValidation['valid'] || !$paymentValidation['valid']) {
+                    $invalidReference[] = [
+                        'uuid' => $item['uuid'],
+                        'reason' => [
+                            'category' => $categoryValidation['valid'] ? 'ok' : $categoryValidation['reason'],
+                            'payment_method' => $paymentValidation['valid'] ? 'ok' : $paymentValidation['reason'],
+                        ],
+                    ];
+                    continue;
+                }
 
-        // -------------------
-        // Handle Updated
-        // -------------------
-        foreach ($validated['updated'] ?? [] as $item) {
 
-            $transaction = Transaction::where('uuid', $item['uuid'])
-                ->where('user_id', $userId)
-                ->first();
+                // handle update and restore
+                if ($existingByUuid) {
 
-            if (!$transaction) continue;
+                    if ($existingByUuid->trashed()) {
+                        $existingByUuid->restore();
+                    }
 
-            // category permission check for security
-            $category = Category::find($item['category_id']);
-            if (!$category || (!$category->is_global && $category->user_id !== $userId)) {
-                continue;
-            }
+                    $clientTime = Carbon::parse($item['client_updated_at']);
+                    $serverTime = $existingByUuid->client_updated_at ?
+                        Carbon::parse($existingByUuid->client_updated_at) :
+                        Carbon::createFromTimestamp(0);
 
-            // $paymentMethod = PaymentMethod::find($item['payment_method_id']);
-            // if (!$paymentMethod || $paymentMethod->user_id !== $userId) {
-            //     continue;
-            // }
-            $clientTime = strtotime($item['client_updated_at']);
-            $serverTime = strtotime($transaction->client_updated_at);
+                    if ($clientTime->greaterThan($serverTime)) {
 
-            // Conflict resolution-> only update if client has newer updated_at
-            if (!$transaction->client_updated_at   || $clientTime > $serverTime) {
-                $transaction->update([
+                        $existingByUuid->update([
+                            'category_id' => $item['category_id'],
+                            'payment_method_id' => $item['payment_method_id'],
+                            'transaction_amount' => $item['transaction_amount'],
+                            'transaction_type' => $item['transaction_type'],
+                            'transaction_date' => $item['transaction_date'],
+                            'client_updated_at' => $clientTime,
+                        ]);
+                    }
+                    $createdResp[] = $existingByUuid;
+                    continue;
+                }
+
+
+
+                // Case 2: Create new transaction
+                $transaction = Transaction::create([
+                    'uuid' => $item['uuid'],
+                    'user_id' => $userId,
                     'category_id' => $item['category_id'],
                     'payment_method_id' => $item['payment_method_id'],
                     'transaction_amount' => $item['transaction_amount'],
                     'transaction_type' => $item['transaction_type'],
                     'transaction_date' => $item['transaction_date'],
-                    'client_updated_at' => $item['client_updated_at'],
+                    'client_updated_at' => Carbon::parse($item['client_updated_at']),
                 ]);
+
+                $createdResp[] = $transaction;
             }
 
-            $updatedResp[] = $transaction;
-        }
 
-        // -------------------
-        // Handle Deleted
-        // -------------------
-        if (!empty($validated['deleted'])) {
-            $toDelete =   Transaction::whereIn('uuid', $validated['deleted'])
-                ->where('user_id', $userId)
-                ->get();
+            // -------------------
+            // Handle Updated
+            // -------------------
 
-            foreach ($toDelete as $t) {
-                if (!$t->deleted_at) {
-                    $t->delete();
+            foreach ($validated['updated'] ?? [] as $item) {
+
+                $transaction = Transaction::where('uuid', $item['uuid'])
+                    ->where('user_id', $userId)
+                    ->first();
+
+                if (!$transaction || $transaction->trashed()) continue;
+
+                // category and payment Method validation
+
+                $categoryValidation = $this->validateCategory($item['category_id'], $userId);
+                $paymentValidation = $this->validatePaymentMethod($item['payment_method_id'], $userId);
+
+                if (!$categoryValidation['valid'] || !$paymentValidation['valid']) {
+                    $invalidReference[] = [
+                        'uuid' => $item['uuid'],
+                        'reason' => [
+                            'category' => $categoryValidation['valid'] ? 'ok' : $categoryValidation['reason'],
+                            'payment_method' => $paymentValidation['valid'] ? 'ok' : $paymentValidation['reason'],
+                        ],
+                    ];
+                    continue;
                 }
+
+                // conflict handling
+                $clientTime = Carbon::parse($item['client_updated_at']);
+                $serverTime = $transaction->client_updated_at ?
+                    Carbon::parse($transaction->client_updated_at) :
+                    Carbon::createFromTimestamp(0);
+
+                // Conflict resolution-> only update if client has newer updated_at
+                if ($clientTime->greaterThan($serverTime)) {
+                    $transaction->update([
+                        'category_id' => $item['category_id'],
+                        'payment_method_id' => $item['payment_method_id'],
+                        'transaction_amount' => $item['transaction_amount'],
+                        'transaction_type' => $item['transaction_type'],
+                        'transaction_date' => $item['transaction_date'],
+                        'client_updated_at' => $item['client_updated_at'],
+                    ]);
+                }
+
+                $updatedResp[] = $transaction;
             }
-            $deletedResp = $validated['deleted'];
+
+            // -------------------
+            // Handle Deleted
+            // -------------------
+            if (!empty($validated['deleted'])) {
+                $toDelete =   Transaction::whereIn('uuid', $validated['deleted'])
+                    ->where('user_id', $userId)
+                    ->get();
+
+                foreach ($toDelete as $t) {
+                    if (!$t->deleted_at) {
+                        $t->delete();
+                    }
+                }
+                $deletedResp = $validated['deleted'];
+            }
+            Db::commit();
+        } catch (\Exception $e) {
+            Db::rollBack();
+            return response()->json([
+                'response' => '200',
+                'message' => 'Sync failed. ' . $e->getMessage(),
+            ], 500);
         }
 
         // -------------------
         // Return full server state for sync
         // -------------------
+        $lastSyncTime = Carbon::parse($validated['last_sync_at']);
         $changedData = Transaction::withTrashed()
             ->where('user_id', $userId)
-            ->where(function ($data) use ($validated) {
-                $data->where('created_at', '>', $validated['last_sync_at'])
-                    ->orWhere('updated_at', '>', $validated['last_sync_at'])
-                    ->orWhere('deleted_at', '>', $validated['last_sync_at']);
+            ->where(function ($data) use ($lastSyncTime) {
+                $data->where('created_at', '>', $lastSyncTime)
+                    ->orWhere('updated_at', '>', $lastSyncTime)
+                    ->orWhere('deleted_at', '>', $lastSyncTime);
             })
             ->get();
 
@@ -182,7 +242,68 @@ class TransactionController extends Controller
             ],
         ]);
     }
+    // validate category and payment method
+    private function validateCategory($categoryId, $userId)
+    {
+        $category = Category::withTrashed()->find($categoryId);
+        if (!$category) {
+            return [
+                'valid' => false,
+                'reason' => 'Not found',
+            ];
+        }
+        //? the logic is 
+        // ! if this category is not global and does not belong to current user than user is not allowed to reference it
 
+        if (!$category->is_global && $category->user_id != $userId) {
+            return [
+                'valid' => false,
+                'reason' => 'unauthorized'
+            ];
+        }
+
+        if ($category->trashed()) {
+            return [
+                'valid' => false,
+                'reason' => 'deleted',
+            ];
+        }
+
+        return [
+            'valid' => true,
+            'category' => $category,
+        ];
+    }
+
+    private function validatePaymentMethod($paymentMethodId, $userid)
+    {
+        $paymentMethod = PaymentMethod::withTrashed()->find($paymentMethodId);
+
+        if (!$paymentMethod) {
+            return [
+                'valid' => false,
+                'reason' => 'not_found'
+            ];
+        }
+
+        if ($paymentMethod->user_id != $userid) {
+            return [
+                'valid' => false,
+                'reason' => 'unauthorized',
+            ];
+        }
+
+        if ($paymentMethod->trashed())
+            return [
+                'valid' => false,
+                'reason' => 'deleted'
+            ];
+
+        return [
+            'valid' => true,
+            'payment_method' => $paymentMethod
+        ];
+    }
     /**
      * Display all trashed items only.
      */
