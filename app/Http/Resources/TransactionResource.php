@@ -16,23 +16,19 @@ class TransactionResource extends JsonResource
     {
         return [
             'uuid' => $this->uuid,
-
             'category' => $this->category ? [
                 'id'        => $this->category->id,
                 'name'      => $this->category->name,
-                'type'      => $this->category->type,
                 'is_global' => $this->category->is_global,
             ] : null,
-
             'payment_method' => $this->paymentMethod ? [
                 'id'        => $this->paymentMethod->id,
                 'name'      => $this->paymentMethod->name,
-                'is_global' => $this->paymentMethod->is_global,
+                'type'      => $this->paymentMethod->type,
             ] : null,
-
             'transaction_amount' => $this->transaction_amount,
             'transaction_date' => $this->transaction_date?->toDateTimeString(),
-
+            'transaction_type' => $this->transaction_type,
             'client_updated_at'  => $this->client_updated_at?->toDateTimeString(),
 
 
