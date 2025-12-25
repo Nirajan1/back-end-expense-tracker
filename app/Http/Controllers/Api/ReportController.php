@@ -12,18 +12,25 @@ use Illuminate\Support\Facades\Auth;
 
 class ReportController extends Controller
 {
+    // report based on type income or expense
     public function transaction(Request $request)
     {
         $userId = Auth::id();
+        $type = $request->query('type');
+
+        if (!in_array($type, ['income', 'expense'])) {
+            return response()->json([
+                'response' => '400',
+                'message' =>  'Invalid transaction type. Allowed: income, expense.',
+            ], 400);
+        }
 
         $baseQuery = Transaction::where('user_id', $userId)
-            ->where('transaction_type', $request->query('type'))
-            ->whereNull('deleted_at');
+            ->where('transaction_type', $request->query('type'));
 
         $transaction = Transaction::where('user_id', $userId)
             ->where('transaction_type', $request->query('type'))
             ->with(['category', 'paymentMethod'])
-            ->whereNull('deleted_at')
             ->orderBy('transaction_date', 'desc')
             ->paginate(15);
 
@@ -35,19 +42,21 @@ class ReportController extends Controller
             'data' =>  TransactionReportResource::collection($transaction),
         ]);
     }
+
+    // summary of total income , expense and net balance
     public function summary()
     {
         $userId = Auth::id();
 
         $totalIncome = Transaction::where('user_id', $userId)
             ->where('transaction_type', 'income')
-            ->whereNull('deleted_at')
+
             ->sum('transaction_amount');
 
 
         $totalExpense = Transaction::where('user_id', $userId)
             ->where('transaction_type', 'expense')
-            ->whereNull('deleted_at')
+
             ->sum('transaction_amount');
 
         return response()->json([
@@ -62,7 +71,7 @@ class ReportController extends Controller
         $userId = Auth::id();
 
         $data = Transaction::where('user_id', $userId)
-            ->whereNull('deleted_at')
+
             ->selectRaw(
                 '
                 YEAR(transaction_date) as year,
@@ -100,9 +109,8 @@ class ReportController extends Controller
     {
         $userId = Auth::id();
 
-        $data = Transaction::withTrashed()
-            ->where('transactions.user_id', $userId)
-            ->where('transactions.transaction_type', 'expense')
+        $data = Transaction::where('user_id', $userId)
+            ->where('transaction_type', 'expense')
             ->join('categories', 'categories.id', '=', 'transactions.category_id')
             ->selectRaw('
             categories.id as category_id,
@@ -112,13 +120,11 @@ class ReportController extends Controller
             ->groupBy('categories.id', 'categories.name')
             ->orderByDesc('total_expense')
             ->get()
-            ->map(function ($data) {
-                return [
-                    'category_id' => $data->category_id,
-                    'category_name' => $data->category_name,
-                    'total_expense' =>  (float) $data->total_expense,
-                ];
-            });
+            ->map(fn($data) => [
+                'category_id' => $data->category_id,
+                'category_name' => $data->category_name,
+                'total_expense' =>  (float) $data->total_expense,
+            ]);
 
 
         return response()->json([
@@ -132,9 +138,8 @@ class ReportController extends Controller
     {
         $userId = Auth::id();
 
-        $data = Transaction::withTrashed()
-            ->where('transactions.user_id', $userId)
-            ->where('transactions.transaction_type', 'expense')
+        $data = Transaction::where('user_id', $userId)
+            ->where('transaction_type', 'expense')
             ->join('payment_methods', 'payment_methods.id', '=', 'transactions.payment_method_id')
             ->selectRaw('
             payment_methods.id as payment_method_id,
@@ -142,13 +147,11 @@ class ReportController extends Controller
             SUM(transactions.transaction_amount) as total_expense
         ')->groupBy('payment_methods.id', 'payment_methods.name')
             ->get()
-            ->map(function ($row) {
-                return [
-                    'payment_method_id' => $row->payment_method_id,
-                    'payment_method_name' => $row->payment_method_name,
-                    'total_expense' => (float) $row->total_expense,
-                ];
-            });
+            ->map(fn($row) => [
+                'payment_method_id' => $row->payment_method_id,
+                'payment_method_name' => $row->payment_method_name,
+                'total_expense' => (float) $row->total_expense,
+            ]);
 
         return response()->json([
             'data' => $data,

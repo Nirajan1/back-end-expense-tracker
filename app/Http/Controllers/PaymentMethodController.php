@@ -27,7 +27,7 @@ class PaymentMethodController extends Controller
             'created.*.client_updated_at' => 'required|date',
 
             'updated' => 'array',
-            'updated.*.uuid' => 'required|uuid|exists:paymentMethods,uuid',
+            'updated.*.uuid' => 'required|uuid',
             'updated.*.name' => 'required|string',
             'updated.*.type' => 'required|in:CASH,BANK,CARD,WALLET,ONLINE',
             'updated.*.client_updated_at' => 'required|date',

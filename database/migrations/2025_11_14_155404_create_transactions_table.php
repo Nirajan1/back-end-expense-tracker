@@ -34,6 +34,12 @@ return new class extends Migration
 
             //? laravel timestamp server time
             $table->timestamps();
+
+            // Indexes
+            $table->index('user_id');
+            $table->index(['user_id', 'transaction_type']);
+            $table->index('transaction_date');
+            $table->index(['user_id', 'transaction_date']);
         });
     }
 

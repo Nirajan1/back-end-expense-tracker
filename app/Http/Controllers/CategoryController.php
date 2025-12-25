@@ -7,9 +7,26 @@ use App\Models\Category;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Str;
 
 class CategoryController extends Controller
 {
+
+    public function  index()
+    {
+        $userId = Auth::id();
+        $categories = Category::where(function ($query) use ($userId) {
+            $query->where('is_global', true)
+                ->orWhere('user_id', $userId);
+        })->orderBy('name', 'asc')
+            ->get();
+
+        return response()->json([
+            'response' => '200',
+            'message' => 'Category fetched successfully.',
+            'data' => CategoryResource::collection($categories),
+        ], 200);
+    }
     // category sync method
     public function categorySync(Request $request)
     {
@@ -62,7 +79,7 @@ class CategoryController extends Controller
 
                 if ($client > $server) {
                     $existing->update([
-                        'name' => trim($categoryItem['name']),
+                        'name' => Str::ucfirst($categoryItem['name']),
                         'client_updated_at' => $categoryItem['client_updated_at'],
                     ]);
                 }
@@ -73,16 +90,17 @@ class CategoryController extends Controller
 
             // ? case 2 
 
-            $softDeletedSameName = Category::onlyTrashed()
+            $softDeletedSameName = Category::withTrashed()
                 ->where('user_id', $userId)
                 ->whereRaw('LOWER (name) = ? ', [strtolower($categoryItem['name'])])
                 ->first();
+
             if ($softDeletedSameName) {
                 $softDeletedSameName->restore();
 
                 $softDeletedSameName->update([
                     'uuid' => $categoryItem['uuid'],
-                    'name'  => $categoryItem['name'],
+                    'name'  => Str::ucfirst($categoryItem['name']),
                     'client_updated_at' => $categoryItem['client_updated_at'],
                 ]);
 
@@ -90,12 +108,20 @@ class CategoryController extends Controller
                 continue;
             }
 
+            // case 3 global category that already exists
+            $globalCategory = Category::where("is_global", true)
+                ->whereRaw('LOWER (name) = ? ', [strtolower($categoryItem['name'])])
+                ->first();
 
-            //case 3 if genuinely new create new one immediately
+            if ($globalCategory) {
+                $createdCategoryResp[] = $globalCategory;
+                continue;
+            }
+            //case 4 if genuinely new create new one immediately
             $newCategory = Category::create([
                 'uuid' => $categoryItem['uuid'],
                 'user_id' => $userId,
-                'name' => $categoryItem['name'],
+                'name' => Str::ucfirst($categoryItem['name']),
                 'is_global' => false,
                 'client_updated_at' => $categoryItem['client_updated_at'],
             ]);
@@ -122,7 +148,7 @@ class CategoryController extends Controller
 
             if (! $serverTime || $clientTime > $serverTime) {
                 $category->update([
-                    'name' => $item['name'],
+                    'name' => Str::ucfirst($categoryItem['name']),
                     'client_updated_at' => $item['client_updated_at'],
                 ]);
             }

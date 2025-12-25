@@ -25,6 +25,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::apiResource('addresses', AddressController::class);
 
     // category controller
+    Route::get('categories/index', [CategoryController::class, 'index']);
     Route::post('/categories/sync', [CategoryController::class, 'categorySync']);
 
     //? payment methods 
