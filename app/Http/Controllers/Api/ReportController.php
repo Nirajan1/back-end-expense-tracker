@@ -109,7 +109,7 @@ class ReportController extends Controller
     {
         $userId = Auth::id();
 
-        $data = Transaction::where('user_id', $userId)
+        $data = Transaction::where('transactions.user_id', $userId)
             ->where('transaction_type', 'expense')
             ->join('categories', 'categories.id', '=', 'transactions.category_id')
             ->selectRaw('
@@ -121,9 +121,9 @@ class ReportController extends Controller
             ->orderByDesc('total_expense')
             ->get()
             ->map(fn($data) => [
-                'category_id' => $data->category_id,
-                'category_name' => $data->category_name,
-                'total_expense' =>  (float) $data->total_expense,
+                // 'category_id' => $data->category_id,
+                'label' => $data->category_name,
+                'value' =>  (float) $data->total_expense,
             ]);
 
 
@@ -138,7 +138,7 @@ class ReportController extends Controller
     {
         $userId = Auth::id();
 
-        $data = Transaction::where('user_id', $userId)
+        $data = Transaction::where('transaction.user_id', $userId)
             ->where('transaction_type', 'expense')
             ->join('payment_methods', 'payment_methods.id', '=', 'transactions.payment_method_id')
             ->selectRaw('
