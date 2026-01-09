@@ -24,7 +24,6 @@ class UserResource extends JsonResource
             'user_photo' => $this->user_photo ? url($this->user_photo) : null,
             'is_active' => (bool) $this->is_active,
             'currency' => $this->currency,
-            'device_name' => $this->device_name,
             'created_at' => $this->created_at,
             'updated_at' => $this->updated_at,
         ];

@@ -25,7 +25,7 @@ class User extends Authenticatable
         'last_name',
         'email',
         'phone_number',
-        'last_login_at',
+        'user_photo',
         'currency',
         'device_name',
         'password',
@@ -40,7 +40,7 @@ class User extends Authenticatable
         'password',
         'remember_token',
     ];
-    protected $casts = ['isActive' => 'boolean'];
+    protected $casts = ['isActive' => 'boolean', 'last_login_at' => 'datetime',];
     protected $dates = ['deleted_at'];
 
     /**

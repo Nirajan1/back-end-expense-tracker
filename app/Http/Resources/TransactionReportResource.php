@@ -18,7 +18,7 @@ class TransactionReportResource extends JsonResource
             'uuid' => $this->uuid,
             'category' => $this->category->name,
             'payment_method' => $this->paymentMethod->name,
-            'transaction_amount' => $this->transaction_amount,
+            'transaction_amount' => (float) $this->transaction_amount,
             'transaction_type' => $this->transaction_type,
             'transaction_date' => $this->transaction_date,
             'client_updated_at' => $this->client_updated_at,

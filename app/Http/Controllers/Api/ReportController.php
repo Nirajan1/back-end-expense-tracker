@@ -38,7 +38,7 @@ class ReportController extends Controller
 
         return response()->json([
             'type' => $request->query('type'),
-            'total_amount' => $totalAmount,
+            'total_amount' => (float) $totalAmount,
             'data' =>  TransactionReportResource::collection($transaction),
         ]);
     }
@@ -50,19 +50,17 @@ class ReportController extends Controller
 
         $totalIncome = Transaction::where('user_id', $userId)
             ->where('transaction_type', 'income')
-
             ->sum('transaction_amount');
 
 
         $totalExpense = Transaction::where('user_id', $userId)
             ->where('transaction_type', 'expense')
-
             ->sum('transaction_amount');
 
         return response()->json([
-            'income_total' => $totalIncome,
-            'expense_total' => $totalExpense,
-            'net_balance' => $totalIncome - $totalExpense,
+            'income_total' => (float) $totalIncome,
+            'expense_total' => (float) $totalExpense,
+            'net_balance' => (float) ($totalIncome - $totalExpense),
         ]);
     }
     // monthly summary
@@ -121,9 +119,9 @@ class ReportController extends Controller
             ->orderByDesc('total_expense')
             ->get()
             ->map(fn($data) => [
-                // 'category_id' => $data->category_id,
-                'label' => $data->category_name,
-                'value' =>  (float) $data->total_expense,
+                'category_id' => $data->category_id,
+                'category_name' => $data->category_name,
+                'total_expense' =>  (float) $data->total_expense,
             ]);
 
 
